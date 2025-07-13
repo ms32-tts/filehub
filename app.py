@@ -4,7 +4,6 @@ from werkzeug.utils import secure_filename
 
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar', '7z', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -12,11 +11,6 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Max 100MB upload limit
 
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# --- Helper Function ---
-def allowed_file(filename):
-    """Check if file extension is allowed."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- Routes ---
 @app.route('/')
@@ -35,7 +29,7 @@ def upload_file():
     if file.filename == '':
         return jsonify({'message': '[[ERROR]]: No selected file.'}), 400
 
-    if file and allowed_file(file.filename):
+    if file:
         filename = secure_filename(file.filename)
         try:
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -81,4 +75,4 @@ def delete_file(filename):
 
 # --- Run ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
