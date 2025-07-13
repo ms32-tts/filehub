@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project MS32_FileHUB</title>
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <style>
+    /* Global Styles */
+    :root {
+      --bg-color: #0d1117;
+      /* Dark background */
+      --text-color: #00ff00;
+      /* Neon green for main text */
+      --border-color: #238636;
+      /* Darker green for borders */
+      --button-bg: #28a745;
+      /* Action green */
+      --button-hover: #218838;
+      --input-bg: #161b22;
+      /* Darker input background */
+      --error-color: #dc3545;
+      /* Red for errors */
+      --accent-blue: #007bff;
+      /* Blue for progress bar */
+      --sidebar-bg: #161b22;
+      /* Slightly lighter dark for sidebar */
+      --sidebar-text: #00fa9a;
+      /* Lighter neon for sidebar text */
+    }
+
+    body {
+      font-family: 'Silkscreen', monospace;
+      /* Hacker-style font */
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden;
+      /* Prevent body scroll, content will scroll */
+    }
+
+    /* Scanline effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(to bottom,
+          transparent 0px,
+          transparent 1px,
+          rgba(0, 255, 0, 0.05) 1px,
+          rgba(0, 255, 0, 0.05) 2px);
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.1;
+    }
+
+    /* Glitch effect for title */
+    @keyframes glitch {
+      0% {
+        text-shadow: 2px 0 var(--error-color), -2px 0 var(--accent-blue);
+        transform: translate(0);
+      }
+
+      25% {
+        text-shadow: -2px 0 var(--accent-blue), 2px 0 var(--error-color);
+        transform: translate(-1px, 1px);
+      }
+
+      50% {
+        text-shadow: 2px 0 var(--error-color), -2px 0 var(--accent-blue);
+        transform: translate(1px, -1px);
+      }
+
+      75% {
+        text-shadow: -2px 0 var(--accent-blue), 2px 0 var(--error-color);
+        transform: translate(-1px, 1px);
+      }
+
+      100% {
+        text-shadow: 0 0, 0 0;
+        transform: translate(0);
+      }
+    }
+
+    .site-heading {
+      text-align: center;
+      font-size: 2.8em;
+      /* Larger, imposing title */
+      color: var(--text-color);
+      /* REDUCED GLOW HERE */
+      text-shadow: 0 0 5px var(--text-color), 0 0 10px rgba(0, 255, 0, 0.3);
+      margin-bottom: 40px;
+      animation: glitch 1s infinite alternate;
+      /* Apply glitch effect */
+    }
+
+    /* Sidebar Styling */
+    .sidebar {
+      width: 300px;
+      background-color: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      padding: 20px;
+      box-shadow: 2px 0 15px rgba(0, 255, 0, 0.3);
+      /* Green glow */
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      /* Enable scrolling for file list */
+      border-right: 1px solid var(--border-color);
+    }
+
+    .sidebar h2 {
+      color: var(--sidebar-text);
+      margin-top: 0;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: center;
+      /* REDUCED GLOW HERE */
+      text-shadow: 0 0 4px var(--sidebar-text);
+    }
+
+    .sidebar ul {
+      list-style-type: none;
+      padding: 0;
+      flex-grow: 1;
+    }
+
+    .sidebar li {
+      margin-bottom: 10px;
+      display: flex;
+      /* For alignment of file name and delete button */
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      /* For delete button positioning */
+    }
+
+    .sidebar a {
+      color: var(--sidebar-text);
+      text-decoration: none;
+      display: block;
+      padding: 8px 10px;
+      border-radius: 4px;
+      transition: background-color 0.2s ease, color 0.2s ease;
+      white-space: nowrap;
+      /* Prevent text wrapping */
+      overflow: hidden;
+      /* Hide overflowed text */
+      text-overflow: ellipsis;
+      /* Add ellipsis for overflow */
+      flex-grow: 1;
+      /* Allow link to take available space */
+    }
+
+    .sidebar a:hover {
+      background-color: var(--border-color);
+      color: var(--bg-color);
+      /* Dark text on hover */
+    }
+
+    /* Delete button styling */
+    .sidebar .delete-file-btn {
+      background: none;
+      border: none;
+      color: var(--error-color);
+      cursor: pointer;
+      font-size: 1.1em;
+      margin-left: 10px;
+      padding: 5px;
+      /* Add padding for easier click */
+      transition: color 0.2s ease, transform 0.2s ease;
+      opacity: 0;
+      /* Hidden by default */
+      visibility: hidden;
+      /* Hidden by default */
+      pointer-events: none;
+      /* Disable interaction when hidden */
+    }
+
+    .sidebar li:hover .delete-file-btn {
+      opacity: 1;
+      /* Visible on hover */
+      visibility: visible;
+      pointer-events: auto;
+      /* Enable interaction on hover */
+      transform: translateX(0);
+    }
+
+    .sidebar .delete-file-btn:hover {
+      color: #ff0000;
+      transform: scale(1.1);
+      /* Slight grow effect on hover */
+    }
+
+    .sidebar .empty-list,
+    .temporary-note {
+      font-style: italic;
+      color: #888;
+      /* Slightly subdued for notes */
+      text-align: center;
+      padding-top: 20px;
+    }
+
+    .temporary-note {
+      font-size: 0.8em;
+      margin-top: auto;
+      /* Push to bottom */
+      padding-top: 20px;
+      border-top: 1px dashed var(--border-color);
+    }
+
+
+    /* Main Content Styling */
+    .main-content {
+      flex-grow: 1;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-y: auto;
+      /* Enable main content scrolling */
+    }
+
+    /* Upload Section Styling */
+    .upload-section {
+      background-color: var(--input-bg);
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+      /* Intense green glow */
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+      border: 2px solid var(--border-color);
+    }
+
+    .upload-section label {
+      display: block;
+      font-size: 1.3em;
+      margin-bottom: 25px;
+      color: var(--text-color);
+      text-shadow: 0 0 0px var(--text-color);
+    }
+
+    .upload-section input[type="file"] {
+      display: block;
+      width: calc(100% - 20px);
+      /* Adjust for padding */
+      padding: 10px;
+      margin: 0 auto 30px auto;
+      /* Center input */
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      border-radius: 5px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Custom file input appearance for better theme integration */
+    input[type="file"]::-webkit-file-upload-button {
+      visibility: hidden;
+    }
+
+    input[type="file"]::before {
+      content: 'SELECT [FILE_0XFA]';
+      /* Custom button text */
+      display: inline-block;
+      background: var(--button-bg);
+      color: white;
+      border: 1px solid var(--button-bg);
+      border-radius: 5px;
+      padding: 8px 12px;
+      outline: none;
+      white-space: nowrap;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: 'Silkscreen', monospace;
+      font-size: 1em;
+      transition: background-color 0.3s ease;
+    }
+
+    input[type="file"]:hover::before {
+      background-color: var(--button-hover);
+    }
+
+    input[type="file"]:active::before {
+      background-color: var(--button-hover);
+    }
+
+
+    .upload-section button {
+      background-color: var(--button-bg);
+      color: white;
+      padding: 15px 30px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1.2em;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
+      font-family: 'Silkscreen', monospace;
+    }
+
+    .upload-section button:hover {
+      background-color: var(--button-hover);
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+    }
+
+    .upload-section button:disabled {
+      background-color: #444;
+      color: #888;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Progress Bar Styling */
+    .progress-container {
+      width: 100%;
+      background-color: #333;
+      border-radius: 5px;
+      margin-top: 30px;
+      display: none;
+      /* Hidden by default */
+      position: relative;
+      height: 30px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background-color: var(--accent-blue);
+      /* Blue, like data transfer */
+      border-radius: 5px;
+      text-align: center;
+      line-height: 30px;
+      color: white;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 8px var(--accent-blue);
+    }
+
+    .progress-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      line-height: 30px;
+      color: #eee;
+      /* Light text for contrast */
+      font-weight: bold;
+      /* REDUCED GLOW HERE */
+      text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+      display: none;
+      /* Hidden by default */
+    }
+
+    /* Feedback Messages */
+    #feedback {
+      margin-top: 25px;
+      font-size: 1.1em;
+      color: var(--text-color);
+      /* ORIGINAL: text-shadow: 0 0 3px var(--text-color); */
+      /* Adjust this line: */
+      text-shadow: 0 0 2px var(--text-color);
+      /* Smaller blur radius */
+    }
+
+    .upload-success {
+      color: var(--text-color);
+      /* Green for success */
+    }
+
+    .upload-error {
+      color: var(--error-color);
+      /* Red for error */
+      /* ORIGINAL: text-shadow: 0 0 3px var(--error-color); */
+      /* Adjust this line: */
+      text-shadow: 0 0 2px var(--error-color);
+      /* Smaller blur radius */
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+        overflow-y: auto;
+        /* Allow scrolling on smaller screens for entire page */
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 250px;
+        /* Limit sidebar height on small screens */
+        order: 2;
+        /* Move sidebar below main content */
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        box-shadow: 0 -2px 15px rgba(0, 255, 0, 0.3);
+      }
+
+      .main-content {
+        order: 1;
+        padding: 20px;
+        overflow-y: visible;
+        /* Content flows naturally */
+      }
+
+      .site-heading {
+        font-size: 2em;
+      }
+
+      .upload-section {
+        max-width: 95%;
+        /* Use more width on small screens */
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .upload-section button {
+        padding: 12px 20px;
+        font-size: 1.1em;
+      }
+
+      .progress-container {
+        height: 25px;
+      }
+
+      .progress-bar,
+      .progress-text {
+        line-height: 25px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <aside class="sidebar">
+    <h2>[FILE_DIRECTORY]</h2>
+    <ul id="fileList">
+      <!-- Files will be loaded here by JavaScript -->
+      <li class="empty-list" id="emptyListMessage">[NO_FILES_DETECTED]</li>
+    </ul>
+  </aside>
+
+  <main class="main-content">
+    <h2 class="site-heading">
+      <pre>                               Project MS32_FileHUB</pre>
+    </h2>
+
+    <section class="upload-section">
+      <label for="fileInput">[INITIATE_UPLOAD]: Select payload file for deployment</label>
+      <input type="file" id="fileInput" name="file" required>
+      <button id="uploadButton">[EXECUTE_UPLOAD]</button>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-text" id="progressText">[0%_TRANSFER]</div>
+      </div>
+
+      <div id="feedback"></div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadButton = document.getElementById('uploadButton');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const feedbackDiv = document.getElementById('feedback');
+    const fileListUl = document.getElementById('fileList');
+    const emptyListMessage = document.getElementById('emptyListMessage');
+
+    // Function to fetch and display the file list
+    async function fetchFileList() {
+      try {
+        const response = await fetch('/list_files_json');
+        if (!response.ok) {
+          throw new Error(`[ERROR]: Status ${response.status}`);
+        }
+        const files = await response.json();
+        fileListUl.innerHTML = ''; // Clear existing list
+
+        if (files.length === 0) {
+          emptyListMessage.style.display = 'block';
+          fileListUl.appendChild(emptyListMessage);
+        } else {
+          emptyListMessage.style.display = 'none';
+          files.forEach(file => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = `/download/${file}`; // Link to download route
+            a.textContent = `${file}`;
+            a.download = file; // Suggest download name
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-file-btn';
+            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; // Font Awesome trash icon
+            deleteBtn.title = `Delete ${file}`;
+            deleteBtn.onclick = (e) => {
+              e.preventDefault(); // Prevent navigating
+              deleteFile(file);
+            };
+
+            li.appendChild(a);
+            li.appendChild(deleteBtn);
+            fileListUl.appendChild(li);
+          });
+        }
+      } catch (error) {
+        console.error('[ERROR_FETCHING_FILE_LIST]:', error);
+        feedbackDiv.className = 'upload-error'; // Show error in main feedback area too
+        feedbackDiv.textContent = '[ERROR]: Failed to load file list. Server unreachable?';
+        fileListUl.innerHTML = `<li class="empty-list" style="color:var(--error-color);">[ERROR_LOADING_FILES]</li>`;
+      }
+    }
+
+    // Handle file deletion
+    async function deleteFile(filename) {
+      // Using a custom modal or confirmation message instead of alert()
+      const confirmDeletion = await new Promise(resolve => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center;
+                    z-index: 10000;
+                `;
+        modal.innerHTML = `
+                    <div style="background-color: var(--input-bg); padding: 30px; border-radius: 10px;
+                                border: 2px solid var(--border-color); box-shadow: 0 0 20px rgba(0,255,0,0.5);
+                                color: var(--text-color); text-align: center; font-family: 'Silkscreen', monospace;
+                                max-width: 400px;">
+                        <p style="margin-bottom: 20px;">[CONFIRM_DELETE]: Are you sure you want to delete "${filename}"?</p>
+                        <button id="confirmYes" style="background-color: var(--error-color); color: white; padding: 10px 20px;
+                                border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">Yes</button>
+                        <button id="confirmNo" style="background-color: var(--button-bg); color: white; padding: 10px 20px;
+                                border: none; border-radius: 5px; cursor: pointer;">No</button>
+                    </div>
+                `;
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmYes').onclick = () => {
+          document.body.removeChild(modal);
+          resolve(true);
+        };
+        document.getElementById('confirmNo').onclick = () => {
+          document.body.removeChild(modal);
+          resolve(false);
+        };
+      });
+
+
+      if (!confirmDeletion) {
+        feedbackDiv.className = '';
+        feedbackDiv.textContent = '[DELETION_CANCELLED].';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/delete_file/${filename}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        if (response.ok) {
+          feedbackDiv.className = 'upload-success';
+          feedbackDiv.textContent = data.message;
+          fetchFileList(); // Refresh the list
+        } else {
+          feedbackDiv.className = 'upload-error';
+          feedbackDiv.textContent = data.message;
+        }
+      } catch (error) {
+        console.error('[ERROR_DELETING_FILE]:', error);
+        feedbackDiv.className = 'upload-error';
+        feedbackDiv.textContent = '[ERROR]: Could not connect to server for deletion.';
+      }
+    }
+
+    // Handle file upload
+    uploadButton.addEventListener('click', function () {
+      const file = fileInput.files[0];
+
+      if (!file) {
+        feedbackDiv.className = 'upload-error';
+        feedbackDiv.textContent = '[ERROR]: No file selected.';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Reset UI for new upload
+      feedbackDiv.textContent = '';
+      feedbackDiv.className = '';
+      progressBar.style.width = '0%';
+      progressText.textContent = '[0%_TRANSFER]';
+      progressContainer.style.display = 'block';
+      progressText.style.display = 'block';
+      uploadButton.disabled = true; // Disable button during upload
+      fileInput.disabled = true;
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.open('POST', '/upload', true);
+
+      xhr.upload.addEventListener('progress', function (event) {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          progressBar.style.width = percent + '%';
+          progressText.textContent = `[TRANSFERRING]: ${percent}%`;
+          progressBar.style.backgroundColor = 'var(--accent-blue)';
+        }
+      });
+
+      xhr.onload = function () {
+        uploadButton.disabled = false; // Re-enable button
+        fileInput.disabled = false;
+        if (xhr.status === 200) {
+          feedbackDiv.className = 'upload-success';
+          feedbackDiv.textContent = xhr.response ? JSON.parse(xhr.response).message : '[UPLOAD_SUCCESS]: File uploaded.';
+          progressBar.style.backgroundColor = 'var(--button-bg)'; // Green on success
+          fetchFileList(); // Refresh file list
+        } else {
+          feedbackDiv.className = 'upload-error';
+          feedbackDiv.textContent = xhr.response ? JSON.parse(xhr.response).message : xhr.statusText || '[UPLOAD_FAILED]: Unknown error.';
+          progressBar.style.backgroundColor = 'var(--error-color)'; // Red on error
+        }
+        // Hide progress text and bar after a short delay
+        setTimeout(() => {
+          progressText.style.display = 'none';
+          progressContainer.style.display = 'none';
+        }, 2000);
+      };
+
+      xhr.onerror = function () {
+        uploadButton.disabled = false;
+        fileInput.disabled = false;
+        feedbackDiv.className = 'upload-error';
+        feedbackDiv.textContent = '[CONNECTION_ERROR]: Server unreachable.';
+        progressBar.style.backgroundColor = 'var(--error-color)'; // Red on error
+        setTimeout(() => {
+          progressText.style.display = 'none';
+          progressContainer.style.display = 'none';
+        }, 2000);
+      };
+
+      xhr.send(formData);
+    });
+
+    // Custom Alert/Message Box Function (replaces alert() and confirm())
+    function showCustomAlert(message) {
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center;
+                z-index: 10001;
+            `;
+      modal.innerHTML = `
+                <div style="background-color: var(--input-bg); padding: 30px; border-radius: 10px;
+                            border: 2px solid var(--border-color); box-shadow: 0 0 20px rgba(0,255,0,0.5);
+                            color: var(--text-color); text-align: center; font-family: 'Silkscreen', monospace;
+                            max-width: 400px;">
+                    <p style="margin-bottom: 20px;">${message}</p>
+                    <button id="alertClose" style="background-color: var(--button-bg); color: white; padding: 10px 20px;
+                            border: none; border-radius: 5px; cursor: pointer;">OK</button>
+                </div>
+            `;
+      document.body.appendChild(modal);
+
+      document.getElementById('alertClose').onclick = () => {
+        document.body.removeChild(modal);
+      };
+    }
+
+
+    // Initial load of files when the page loads
+    document.addEventListener('DOMContentLoaded', fetchFileList);
+  </script>
+</body>
+
+</html>
