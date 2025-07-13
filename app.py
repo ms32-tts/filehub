@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, redirect, url_for, send_from_directory, render_template, jsonify
+from flask import Flask, request, redirect, send_from_directory, render_template, jsonify
 from werkzeug.utils import secure_filename
 
 # --- Configuration ---
@@ -8,22 +8,20 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar', '
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Max 100MB upload limit
 
-# Create the uploads directory if it doesn't exist
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Ensure uploads folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- Helper Functions ---
+# --- Helper Function ---
 def allowed_file(filename):
-    """Checks if a file's extension is allowed."""
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    """Check if file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- Routes ---
-
 @app.route('/')
 def index():
-    """Renders the main FileHUB page."""
+    """Main upload page."""
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
@@ -47,20 +45,21 @@ def upload_file():
     else:
         return jsonify({'message': '[[UPLOAD_FAILED]]: File type not allowed.'}), 400
 
-@app.route('/list_files_json')
+@app.route('/list_files_json', methods=['GET'])
 def list_files_json():
-    """Returns a JSON list of all uploaded files."""
+    """Returns list of uploaded files."""
     try:
-        files = os.listdir(app.config['UPLOAD_FOLDER'])
+        files = sorted(f for f in os.listdir(app.config['UPLOAD_FOLDER']) if not f.startswith('.'))
         return jsonify(files), 200
     except Exception as e:
         return jsonify({'message': f'[[ERROR]]: Could not list files - {str(e)}'}), 500
 
-@app.route('/download/<filename>')
+@app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
-    """Allows downloading of an uploaded file."""
+    """Download a specific file."""
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+        safe_name = secure_filename(filename)
+        return send_from_directory(app.config['UPLOAD_FOLDER'], safe_name, as_attachment=True)
     except FileNotFoundError:
         return jsonify({'message': f'[[ERROR]]: File "{filename}" not found.'}), 404
     except Exception as e:
@@ -68,19 +67,18 @@ def download_file(filename):
 
 @app.route('/delete_file/<filename>', methods=['POST'])
 def delete_file(filename):
-    """Handles the deletion of an uploaded file."""
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+    """Delete a file by filename."""
+    safe_name = secure_filename(filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-            return jsonify({'message': f'[[DELETION_SUCCESS]]: File "{filename}" purged.'}), 200
+            return jsonify({'message': f'[[DELETION_SUCCESS]]: File "{safe_name}" purged.'}), 200
         except Exception as e:
-            return jsonify({'message': f'[[DELETION_FAILED]]: Could not purge file "{filename}" - {str(e)}'}), 500
+            return jsonify({'message': f'[[DELETION_FAILED]]: Could not purge file - {str(e)}'}), 500
     else:
-        return jsonify({'message': f'[[DELETION_FAILED]]: File "{filename}" not found on server.'}), 404
+        return jsonify({'message': f'[[DELETION_FAILED]]: File "{safe_name}" not found on server.'}), 404
 
-# --- Run the application ---
+# --- Run ---
 if __name__ == '__main__':
-    # For development, you can set debug=True
-    # For production, use a production-ready WSGI server like Gunicorn or Waitress
-    app.run()
+    app.run(debug=True)
